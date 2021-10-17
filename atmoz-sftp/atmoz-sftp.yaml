@@ -1,0 +1,126 @@
+#oc apply -f atmoz-sftp.yaml 
+
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: atmoz-pv
+  labels:
+    app: atmoz
+spec:
+  storageClassName: ""
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/mnt/data"
+
+---
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: atmoz-pvc
+  namespace: atmoz
+  labels:
+    app: atmoz
+spec:
+  storageClassName: ""
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+
+---
+
+
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: atmoz-users
+  namespace: atmoz  
+data:
+  users.conf: |-
+    foo:123:1021:100:/uploads
+    bar:abc:1022:100:/uploads
+    baz:xyz:1023:100:/uploads
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: atmoz-sftp-service
+  namespace: atmoz
+  labels:
+    app: atmoz-sftp
+spec:
+  clusterIP: 10.217.5.48
+  clusterIPs:
+  - 10.217.5.48
+  ports:
+  - name: 22-tcp
+    port: 22
+    protocol: TCP
+    targetPort: 22
+  selector:
+    deployment: atmoz-sftp
+  sessionAffinity: None
+  type: ClusterIP
+status:
+  loadBalancer: {}
+
+---
+
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: atmoz-sftp-route
+  namespace: atmoz
+spec:
+  to:
+    kind: Service
+    name: atmoz-sftp-service
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: atmoz-sftp-deployment
+  namespace: atmoz
+  labels:
+    app: atmoz-sftp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: atmoz-sftp
+  template:
+    metadata:
+      name: atmoz-sftp-pod
+      labels:
+        app: atmoz-sftp
+    spec:      
+      serviceAccountName: atmoz-anyuid-service-account
+      containers:
+      - name: atmoz-sftp
+        image: docker.io/atmoz/sftp
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 22
+          protocol: TCP
+        volumeMounts:
+            - name: users-configmap-volume
+              mountPath: /etc/sftp
+            - name: sftp-storage
+              mountPath: /uploads
+      volumes:
+        - name: users-configmap-volume
+          configMap:
+            name: atmoz-users
+            defaultMode: 420
+        - name: sftp-storage
+          persistentVolumeClaim:
+            claimName: atmoz-pvc
