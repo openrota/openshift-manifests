@@ -1,14 +1,14 @@
 
 
-OPENSHIFT_USER ?= 
-OPENSHIFT_PASSWORD ?= 
-OPENSHIFT_HOST ?= 
+OPENSHIFT_USER ?= kubeadmin
+OPENSHIFT_PASSWORD ?= dRSgC-cSnch-ekyyD-ayoqc
+OPENSHIFT_HOST ?= https://api.crc.testing:6443
 
 MANIFEST_FILENAME ?= atmoz-sftp.yaml
-PROJECT ?= atmoz
+PROJECT ?= sftp
 SCC ?= anyuid
 SVC_ACC_NAME ?= $(PROJECT)-$(SCC)-service-account
-SERVICE_NAME ?= service/atmoz-sftp-service
+SERVICE_NAME ?= service/sftp-service
 
 
 
@@ -43,6 +43,15 @@ service-account:
 
 
 
+.PHONY: secrets
+secrets:
+	@echo "======================================================================"
+	@echo "                      Creating Secrets                                "
+	@echo "======================================================================"
+	oc create secret generic sftp-client-public-keys --from-file=client_keys
+	oc create secret generic sftp-host-keys --from-file=host_keys
+
+
 .PHONY: deploy
 deploy:
 	@echo "======================================================================"
@@ -62,4 +71,4 @@ delete-project:
 
 
 .PHONY: sftp-server
-sftp-server: project service-account deploy
+sftp-server: project service-account secrets deploy

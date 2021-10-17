@@ -1,11 +1,12 @@
 #oc apply -f atmoz-sftp.yaml 
 
+
 kind: PersistentVolume
 apiVersion: v1
 metadata:
-  name: atmoz-pv
+  name: sftp-data-pv
   labels:
-    app: atmoz
+    app: sftp
 spec:
   storageClassName: ""
   capacity:
@@ -20,56 +21,110 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: atmoz-pvc
-  namespace: atmoz
-  labels:
-    app: atmoz
+  name: sftp-data-pvc
+  namespace: sftp
 spec:
-  storageClassName: ""
   accessModes:
     - ReadWriteOnce
+  volumeMode: Filesystem
   resources:
     requests:
       storage: 5Gi
+  storageClassName: ""
 
 ---
 
-
-kind: ConfigMap
-apiVersion: v1
-metadata:
-  name: atmoz-users
-  namespace: atmoz  
-data:
-  users.conf: |-
-    foo:123:1021:100:/uploads
-    bar:abc:1022:100:/uploads
-    baz:xyz:1023:100:/uploads
-
----
-
-apiVersion: v1
 kind: Service
+apiVersion: v1
 metadata:
-  name: atmoz-sftp-service
-  namespace: atmoz
+  name: sftp-service
+  namespace: sftp
   labels:
-    app: atmoz-sftp
+    environment: production
 spec:
-  clusterIP: 10.217.5.48
-  clusterIPs:
-  - 10.217.5.48
+  type: "LoadBalancer"
   ports:
-  - name: 22-tcp
-    port: 22
-    protocol: TCP
+  - name: "ssh"
+    # don't use the default part, to allow the machine this runs on to be accessed using ssh
+    port: 23
     targetPort: 22
   selector:
-    deployment: atmoz-sftp
-  sessionAffinity: None
-  type: ClusterIP
+    app: sftp
 status:
   loadBalancer: {}
+
+---
+
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: sftp-deployment
+  namespace: sftp
+  labels:
+    environment: production
+    app: sftp
+spec:
+  # how many pods and indicate which strategy we want for rolling update
+  replicas: 1
+  minReadySeconds: 10
+  selector:
+    matchLabels:
+      environment: production
+      app: sftp
+
+  template:
+    metadata:
+      labels:
+        environment: production
+        app: sftp
+
+    spec:
+      # secrets and config
+      volumes:
+        - name: sftp-client-public-keys
+          secret:
+            secretName: sftp-client-public-keys
+        - name: sftp-host-keys
+          secret:
+            secretName: sftp-host-keys
+            defaultMode: 0600
+        - name: sftp-data
+          persistentVolumeClaim:
+            claimName: sftp-data-pvc
+      serviceAccountName: sftp-anyuid-service-account
+      containers:
+        # the sftp server itself
+        - name: sftp
+          # use kalioz/sftp:latest instead of atmoz/sftp:latest if you need arm compatibility
+          image: atmoz/sftp:latest
+          imagePullPolicy: IfNotPresent
+          # create users and dirs
+          # user:password:uid:gid:directories
+          args: ["riprasad::::incoming,outgoing"]
+          ports:
+            - containerPort: 22
+          volumeMounts:
+            - mountPath: /home/myUser/.ssh/keys
+              name: sftp-client-public-keys
+              readOnly: true
+            - mountPath: /etc/ssh/ssh_host_rsa_key
+              name: sftp-host-keys
+              subPath: ssh_host_rsa_key
+              readOnly: true
+            - mountPath: /etc/ssh/ssh_host_rsa_key.pub
+              name: sftp-host-keys
+              subPath: ssh_host_rsa_key.pub
+              readOnly: true
+            - mountPath: /etc/ssh/ssh_host_ed25519_key
+              name: sftp-host-keys
+              subPath: ssh_host_ed25519_key
+              readOnly: true
+            - mountPath: /etc/ssh/ssh_host_ed25519_key.pub
+              name: sftp-host-keys
+              subPath: ssh_host_ed25519_key.pub
+              readOnly: true
+            - mountPath: /home/myUser
+              name: sftp-data
 
 ---
 
@@ -77,50 +132,8 @@ apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
   name: atmoz-sftp-route
-  namespace: atmoz
+  namespace: sftp
 spec:
   to:
     kind: Service
-    name: atmoz-sftp-service
-
----
-
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: atmoz-sftp-deployment
-  namespace: atmoz
-  labels:
-    app: atmoz-sftp
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: atmoz-sftp
-  template:
-    metadata:
-      name: atmoz-sftp-pod
-      labels:
-        app: atmoz-sftp
-    spec:      
-      serviceAccountName: atmoz-anyuid-service-account
-      containers:
-      - name: atmoz-sftp
-        image: docker.io/atmoz/sftp
-        imagePullPolicy: IfNotPresent
-        ports:
-        - containerPort: 22
-          protocol: TCP
-        volumeMounts:
-            - name: users-configmap-volume
-              mountPath: /etc/sftp
-            - name: sftp-storage
-              mountPath: /uploads
-      volumes:
-        - name: users-configmap-volume
-          configMap:
-            name: atmoz-users
-            defaultMode: 420
-        - name: sftp-storage
-          persistentVolumeClaim:
-            claimName: atmoz-pvc
+    name: sftp-service
