@@ -100,7 +100,7 @@ spec:
           imagePullPolicy: IfNotPresent
           # create users and dirs
           # user:password:uid:gid:directories
-          args: ["riprasad::::incoming,outgoing"]
+          args: ["user:password:::incoming,outgoing"]
           ports:
             - containerPort: 22
           volumeMounts:
@@ -125,6 +125,9 @@ spec:
               readOnly: true
             - mountPath: /home/myUser
               name: sftp-data
+          securityContext:
+            privileged: true
+
 
 ---
 
