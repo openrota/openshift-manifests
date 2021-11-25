@@ -4,7 +4,7 @@
 kind: PersistentVolume
 apiVersion: v1
 metadata:
-  name: sftp-data-pv
+  name: atmoz-sftp
   labels:
     app: sftp
 spec:
@@ -21,7 +21,7 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: sftp-data-pvc
+  name: atmoz-sftp
   namespace: sftp
 spec:
   accessModes:
@@ -37,7 +37,7 @@ spec:
 kind: Service
 apiVersion: v1
 metadata:
-  name: sftp-service
+  name: atmoz-sftp
   namespace: sftp
   labels:
     environment: production
@@ -58,7 +58,7 @@ status:
 kind: Deployment
 apiVersion: apps/v1
 metadata:
-  name: sftp-deployment
+  name: atmoz-sftp
   namespace: sftp
   labels:
     environment: production
@@ -134,7 +134,7 @@ spec:
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
-  name: atmoz-sftp-route
+  name: atmoz-sftp
   namespace: sftp
 spec:
   to:
