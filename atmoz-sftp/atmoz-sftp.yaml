@@ -1,28 +1,28 @@
 #oc apply -f atmoz-sftp.yaml 
 
 
-kind: PersistentVolume
-apiVersion: v1
-metadata:
-  name: atmoz-sftp
-  labels:
-    app: sftp
-spec:
-  storageClassName: ""
-  capacity:
-    storage: 5Gi
-  accessModes:
-    - ReadWriteOnce
-  hostPath:
-    path: "/mnt/data"
+#kind: PersistentVolume
+#apiVersion: v1
+#metadata:
+#  name: sftp-data-pv
+#  labels:
+#    app: sftp
+#spec:
+#  storageClassName: "aws-ebs"
+#  capacity:
+#    storage: 5Gi
+#  accessModes:
+#    - ReadWriteOnce
+#  hostPath:
+#    path: "/mnt/data"
 
 ---
 
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: atmoz-sftp
-  namespace: sftp
+  name: sftp-data-pvc
+  namespace: openrota--sftp
 spec:
   accessModes:
     - ReadWriteOnce
@@ -30,15 +30,15 @@ spec:
   resources:
     requests:
       storage: 5Gi
-  storageClassName: ""
+  storageClassName: "aws-ebs"
 
 ---
 
 kind: Service
 apiVersion: v1
 metadata:
-  name: atmoz-sftp
-  namespace: sftp
+  name: sftp-service
+  namespace: openrota--sftp
   labels:
     environment: production
 spec:
@@ -58,8 +58,8 @@ status:
 kind: Deployment
 apiVersion: apps/v1
 metadata:
-  name: atmoz-sftp
-  namespace: sftp
+  name: sftp-deployment
+  namespace: openrota--sftp
   labels:
     environment: production
     app: sftp
@@ -134,8 +134,8 @@ spec:
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
-  name: atmoz-sftp
-  namespace: sftp
+  name: atmoz-sftp-route
+  namespace: openrota--sftp
 spec:
   to:
     kind: Service

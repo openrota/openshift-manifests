@@ -5,7 +5,7 @@ OPENSHIFT_PASSWORD ?= dRSgC-cSnch-ekyyD-ayoqc
 OPENSHIFT_HOST ?= https://api.crc.testing:6443
 
 MANIFEST_FILENAME ?= atmoz-sftp.yaml
-PROJECT ?= sftp
+PROJECT ?= openrota--sftp
 SCC ?= anyuid
 SVC_ACC_NAME ?= $(PROJECT)-$(SCC)-service-account
 SERVICE_NAME ?= service/sftp-service
