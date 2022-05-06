@@ -1,0 +1,19 @@
+#apiVersion: tenant.paas.redhat.com/v1alpha1
+#kind: TenantNamespace
+#metadata:
+#  name: sftp
+#  namespace: openrota--config
+#spec:
+#  type: build
+#  network:
+#    security-zone: internal
+
+apiVersion: tenant.paas.redhat.com/v1alpha1
+kind: TenantNamespace
+metadata:  
+  name: runtime-ext
+  namespace: openrota--config
+spec:
+  network:
+    security-zone: external
+  type: runtime

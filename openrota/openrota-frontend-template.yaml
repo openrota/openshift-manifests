@@ -1,0 +1,114 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+labels:
+  app: openrota
+  paas.redhat.com/appcode: ${APP_CODE}
+metadata:
+  name: openrota-ui-template
+message: |-
+  Congratulations on deploying Openrota UI into OpenShift!
+  
+  All components have been deployed and configured.
+objects:
+
+- apiVersion: image.openshift.io/v1
+  kind: ImageStream
+  metadata:
+    name: openrota-ui
+    labels:
+      tier: frontend
+  spec:
+      tags:
+        - name: latest
+          from:
+            kind: DockerImage
+            name: docker.io/openrota/openrota-ui:latest
+
+
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      service.alpha.openshift.io/serving-cert-secret-name: openrota-ui-tls
+    name: openrota-ui
+    labels:
+      tier: frontend
+  spec:
+    selector:
+      deploymentconfig: openrota-ui
+    ports:
+    - name: 1337-https
+      port: 1337
+      protocol: TCP
+      targetPort: 1337
+
+- kind: Route
+  apiVersion: route.openshift.io/v1
+  metadata:
+    name: openrota-ui
+    labels:
+      shard: external
+      tier: frontend
+  spec:
+    host: openrota-ui-ext.apps.ext.spoke.prod.us-west-2.aws.paas.redhat.com
+    to:
+      kind: Service
+      name: openrota-ui
+      weight: 100
+    port:
+      targetPort: 1337-https
+    tls:
+      termination: passthrough
+    wildcardPolicy: None
+
+
+- apiVersion: apps.openshift.io/v1
+  kind: DeploymentConfig
+  metadata:
+    name: openrota-ui
+    labels:
+      tier: frontend
+  spec:
+    replicas: 1
+    selector:
+      deploymentconfig: openrota-ui
+    strategy:
+      activeDeadlineSeconds: 21600
+      resources: {}
+      rollingParams:
+        intervalSeconds: 1
+        maxSurge: 25%
+        maxUnavailable: 25%
+        timeoutSeconds: 600
+        updatePeriodSeconds: 1
+      type: Rolling
+    template:
+      metadata:
+        labels:
+          deploymentconfig: openrota-ui
+          tier: frontend
+      spec:
+        containers:
+        - image: openrota/openrota-ui:latest
+          imagePullPolicy: Always
+          name: openrota-ui
+          ports:
+          - containerPort: 1337
+            protocol: TCP
+    triggers:
+    - type: ConfigChange
+    - type: ImageChange
+      imageChangeParams:
+        automatic: true
+        containerNames:
+        - openrota-ui
+        from:
+          kind: ImageStreamTag
+          name: 'openrota-ui:latest'
+
+parameters:
+- description: CMDB ID of the application.
+  displayName: App Code
+  name: APP_CODE
+  required: true
+  value: OPRO-001
