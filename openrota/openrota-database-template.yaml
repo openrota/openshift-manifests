@@ -5,12 +5,10 @@ labels:
   paas.redhat.com/appcode: ${APP_CODE}
 message: |-
   The following service(s) have been created in your project: ${DATABASE_SERVICE_NAME}.
-
          Username: ${POSTGRESQL_USER}
          Password: ${POSTGRESQL_PASSWORD}
     Database Name: ${POSTGRESQL_DATABASE}
    Connection URL: postgresql://${DATABASE_SERVICE_NAME}:5432/
-
   For more information about using this template, including OpenShift considerations, see https://github.com/sclorg/postgresql-container/.
 metadata:
   name: openrota-database-template
@@ -32,6 +30,7 @@ objects:
     name: ${DATABASE_SERVICE_NAME}
     labels:
       tier: database
+      paas.redhat.com/appcode: ${APP_CODE}
   spec:
     ports:
       - name: postgresql
@@ -50,12 +49,13 @@ objects:
   kind: PersistentVolumeClaim
   metadata:
     annotations:
-      kubernetes.io/reclaimPolicy: Delete
+      kubernetes.io/reclaimPolicy: Retain
     name: ${DATABASE_SERVICE_NAME}
     labels:
       tier: database
+      paas.redhat.com/appcode: ${APP_CODE}
   spec:
-    storageClassName: aws-ebs
+    storageClassName: gp2
     accessModes:
       - ReadWriteOnce
     resources:
@@ -68,6 +68,7 @@ objects:
     name: ${DATABASE_SERVICE_NAME}
     labels:
       tier: database
+      paas.redhat.com/appcode: ${APP_CODE}
   spec:
     updateStrategy:
       type: RollingUpdate
@@ -82,89 +83,84 @@ objects:
           app: ${DATABASE_SERVICE_NAME}
       spec:
         containers:
-          - capabilities: { }
-            env:
-              - name: POSTGRESQL_USER
-                valueFrom:
-                  secretKeyRef:
-                    key: database-user
-                    name: ${DATABASE_SERVICE_NAME}
-              - name: POSTGRESQL_PASSWORD
-                valueFrom:
-                  secretKeyRef:
-                    key: database-password
-                    name: ${DATABASE_SERVICE_NAME}
-              - name: POSTGRESQL_DATABASE
-                valueFrom:
-                  secretKeyRef:
-                    key: database-name
-                    name: ${DATABASE_SERVICE_NAME}
-              - name: PGDATA
-                valueFrom:
-                  secretKeyRef:
-                    key: pgdata
-                    name: ${DATABASE_SERVICE_NAME}
-              - name: POD_IP
-                valueFrom:
-                  fieldRef:
-                    apiVersion: v1
-                    fieldPath: status.podIP
-            image: ' '
-            imagePullPolicy: IfNotPresent
-            livenessProbe:
-              exec:
-                command:
-                  - sh
-                  - -c
-                  - exec pg_isready --host $POD_IP
-              failureThreshold: 6
-              initialDelaySeconds: 60
-              periodSeconds: 10
-              successThreshold: 1
-              timeoutSeconds: 5
-            name: postgresql
-            ports:
-              - containerPort: 5432
-                protocol: TCP
-            readinessProbe:
-              exec:
-                command:
-                  - sh
-                  - -c
-                  - exec pg_isready --host $POD_IP
-              failureThreshold: 3
-              initialDelaySeconds: 5
-              periodSeconds: 5
-              successThreshold: 1
-              timeoutSeconds: 3
-            resources:
-              limits:
-                memory: ${MEMORY_LIMIT}
-            securityContext:
-              capabilities: { }
-              privileged: false
-            terminationMessagePath: /dev/termination-log
-            volumeMounts:
-              - mountPath: /var/lib/pgsql/data
-                name: ${DATABASE_SERVICE_NAME}-data
+        - capabilities: {}
+          env:
+          - name: POSTGRESQL_USER
+            valueFrom:
+              secretKeyRef:
+                key: database-user
+                name: ${DATABASE_SERVICE_NAME}
+          - name: POSTGRESQL_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: database-password
+                name: ${DATABASE_SERVICE_NAME}
+          - name: POSTGRESQL_DATABASE
+            valueFrom:
+              secretKeyRef:
+                key: database-name
+                name: ${DATABASE_SERVICE_NAME}
+          - name: POD_IP
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: status.podIP
+          image: registry.redhat.io/rhel8/postgresql-10
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            exec:
+              command:
+              - sh
+              - -c
+              - exec pg_isready --host $POD_IP
+            failureThreshold: 6
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 5
+          name: postgresql
+          ports:
+          - containerPort: 5432
+            protocol: TCP
+          readinessProbe:
+            exec:
+              command:
+              - sh
+              - -c
+              - exec pg_isready --host $POD_IP
+            failureThreshold: 3
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 3
+          resources:
+            limits:
+              memory: ${MEMORY_LIMIT}
+          securityContext:
+            capabilities: {}
+            privileged: false
+          terminationMessagePath: /dev/termination-log
+          volumeMounts:
+          - mountPath: /var/lib/pgsql/data
+            name: ${DATABASE_SERVICE_NAME}-data
         dnsPolicy: ClusterFirst
         restartPolicy: Always
         volumes:
-          - name: ${DATABASE_SERVICE_NAME}-data
-            persistentVolumeClaim:
-              claimName: ${DATABASE_SERVICE_NAME}
+        - name: ${DATABASE_SERVICE_NAME}-data
+          persistentVolumeClaim:
+            claimName: ${DATABASE_SERVICE_NAME}
     triggers:
-      - imageChangeParams:
-          automatic: true
-          containerNames:
-            - postgresql
-          from:
-            kind: ImageStreamTag
-            name: postgresql:${POSTGRESQL_VERSION}
-            namespace: ${IMAGE_STREAM_NAMESPACE}
-          lastTriggeredImage: ""
-        type: ImageChange
-      - type: ConfigChange
+    - imageChangeParams:
+        automatic: true
+        containerNames:
+        - postgresql
+        from:
+          kind: ImageStreamTag
+          name: postgresql:${POSTGRESQL_VERSION}
+          namespace: ${IMAGE_STREAM_NAMESPACE}
+        lastTriggeredImage: ""
+      type: ImageChange
+    - type: ConfigChange
 
 parameters:
   - description: CMDB ID of the application.
